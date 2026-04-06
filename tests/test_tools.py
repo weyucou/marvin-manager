@@ -114,6 +114,83 @@ class TestWebSearchToolValidation:
         assert "number" in error.lower()
 
 
+# ---- WebSearchTool execution ----
+
+
+class TestWebSearchTool:
+    def setup_method(self) -> None:
+        self.tool = WebSearchTool()
+
+    def test_unconfigured_returns_error(self) -> None:
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", ""):
+            result = asyncio.run(self.tool.execute(query="python"))
+        assert result.error is not None
+        assert "not configured" in result.error
+
+    def test_successful_search_returns_results(self) -> None:
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "web": {
+                "results": [
+                    {"title": "Python.org", "url": "https://www.python.org/", "description": "Official Python site"},
+                ]
+            }
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", "http://localhost:5000"):
+            with patch("httpx.AsyncClient", return_value=mock_cm):
+                result = asyncio.run(self.tool.execute(query="python"))
+
+        assert result.error is None
+        assert result.data["count"] == 1
+        assert result.data["results"][0]["title"] == "Python.org"
+        assert result.data["results"][0]["snippet"] == "Official Python site"
+
+    def test_http_error_returns_error(self) -> None:
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=httpx.HTTPError("Connection refused"))
+
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", "http://localhost:5000"):
+            with patch("httpx.AsyncClient", return_value=mock_cm):
+                result = asyncio.run(self.tool.execute(query="python"))
+
+        assert result.error is not None
+        assert "Search API request failed" in result.error
+
+    def test_num_results_forwarded_as_count(self) -> None:
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"web": {"results": []}}
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", "http://localhost:5000"):
+            with patch("httpx.AsyncClient", return_value=mock_cm):
+                asyncio.run(self.tool.execute(query="python", num_results=3))
+
+        call_kwargs = mock_client.get.call_args
+        assert call_kwargs.kwargs["params"]["count"] == 3
+
+
 # ---- BrowserTool ----
 
 

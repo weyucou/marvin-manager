@@ -4,6 +4,9 @@ import datetime
 import logging
 from typing import Any
 
+import httpx
+
+from marvin.settings import ZAATAR_SEARCH_API_URL
 from marvin.tools.base import BaseTool, ToolParameter, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -118,16 +121,29 @@ class WebSearchTool(BaseTool):
     ]
 
     async def execute(self, query: str, num_results: int = 5) -> ToolResult:
-        """Search the web (placeholder)."""
-        # TODO: Implement actual web search using a search API
+        """Search the web using the configured zaatar-search-api instance."""
+        if not ZAATAR_SEARCH_API_URL:
+            return ToolResult.from_error("WebSearchTool not configured: set ZAATAR_SEARCH_API_URL env var")
+
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    f"{ZAATAR_SEARCH_API_URL.rstrip('/')}/web_search",
+                    params={"query": query, "count": num_results},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.HTTPError as exc:
+            return ToolResult.from_error(f"Search API request failed: {exc}")
+
+        raw_results = data.get("web", {}).get("results", [])
+        results = [
+            {"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("description", "")}
+            for r in raw_results
+        ]
         return ToolResult.success(
-            output=f"Web search for '{query}' is not yet implemented.",
-            data={
-                "query": query,
-                "num_results": num_results,
-                "results": [],
-                "note": "This is a placeholder. Configure a search API to enable.",
-            },
+            output="\n".join(f"{r['title']}: {r['url']} — {r['snippet']}" for r in results),
+            data={"query": query, "results": results, "count": len(results)},
         )
 
 
