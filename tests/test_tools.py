@@ -122,7 +122,7 @@ class TestWebSearchTool:
         self.tool = WebSearchTool()
 
     def test_unconfigured_returns_error(self) -> None:
-        with patch.dict("os.environ", {"ZAATAR_SEARCH_API_URL": ""}):
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", ""):
             result = asyncio.run(self.tool.execute(query="python"))
         assert result.error is not None
         assert "not configured" in result.error
@@ -145,7 +145,7 @@ class TestWebSearchTool:
         mock_cm.__aenter__ = AsyncMock(return_value=mock_client)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
 
-        with patch.dict("os.environ", {"ZAATAR_SEARCH_API_URL": "http://localhost:5000"}):
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", "http://localhost:5000"):
             with patch("httpx.AsyncClient", return_value=mock_cm):
                 result = asyncio.run(self.tool.execute(query="python"))
 
@@ -164,7 +164,7 @@ class TestWebSearchTool:
         mock_cm.__aenter__ = AsyncMock(return_value=mock_client)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
 
-        with patch.dict("os.environ", {"ZAATAR_SEARCH_API_URL": "http://localhost:5000"}):
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", "http://localhost:5000"):
             with patch("httpx.AsyncClient", return_value=mock_cm):
                 result = asyncio.run(self.tool.execute(query="python"))
 
@@ -183,7 +183,7 @@ class TestWebSearchTool:
         mock_cm.__aenter__ = AsyncMock(return_value=mock_client)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
 
-        with patch.dict("os.environ", {"ZAATAR_SEARCH_API_URL": "http://localhost:5000"}):
+        with patch("marvin.tools.builtin.ZAATAR_SEARCH_API_URL", "http://localhost:5000"):
             with patch("httpx.AsyncClient", return_value=mock_cm):
                 asyncio.run(self.tool.execute(query="python", num_results=3))
 

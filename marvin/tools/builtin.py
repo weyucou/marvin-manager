@@ -4,6 +4,9 @@ import datetime
 import logging
 from typing import Any
 
+import httpx
+
+from marvin.settings import ZAATAR_SEARCH_API_URL
 from marvin.tools.base import BaseTool, ToolParameter, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -119,18 +122,13 @@ class WebSearchTool(BaseTool):
 
     async def execute(self, query: str, num_results: int = 5) -> ToolResult:
         """Search the web using the configured zaatar-search-api instance."""
-        import os  # noqa: PLC0415
-
-        import httpx  # noqa: PLC0415
-
-        base_url = os.getenv("ZAATAR_SEARCH_API_URL", "")
-        if not base_url:
+        if not ZAATAR_SEARCH_API_URL:
             return ToolResult.from_error("WebSearchTool not configured: set ZAATAR_SEARCH_API_URL env var")
 
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get(
-                    f"{base_url.rstrip('/')}/web_search",
+                    f"{ZAATAR_SEARCH_API_URL.rstrip('/')}/web_search",
                     params={"query": query, "count": num_results},
                 )
                 resp.raise_for_status()
