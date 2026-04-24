@@ -8,19 +8,48 @@ For the full system architecture see [weyucou/wyc6k-spec](https://github.com/wey
 
 marvin is a stateless worker. It receives a hydrated context bundle (pulled from S3 by the worker entrypoint) and a task description, then runs an `AgentRunner` loop to completion. It does not own scheduling, dispatch, or customer identity — those belong to jones.
 
+## Worker Paths
+
+The `marvin/` codebase supports two execution modes that share the same agent runtime:
+
+| Path | Entry point | Trigger | Lifecycle |
+|------|-------------|---------|-----------|
+| **SQS consumer** | `marvin/worker.py` (`python -m marvin`) | Long-lived container polls SQS | Loops until `SIGTERM`/`SIGINT` |
+| **Fargate one-shot** | `entrypoint.py` | ECS `RunTask` per task (via `TASK_ENVELOPE_JSON` env var) | Runs one task, then `sys.exit` |
+
+Use the **SQS consumer** when you want a persistent, polling worker (e.g., EC2, ECS Service).  
+Use the **Fargate one-shot** when you want per-task isolation with ECS Fargate or AWS Batch — the scheduler enqueues a `RunTask` call and the container exits after the task completes.
+
+### One-shot entrypoint sequence (`entrypoint.py`)
+
+```
+ECS Fargate RunTask  (TASK_ENVELOPE_JSON env override)
+    ↓
+entrypoint.py
+    1. Parse TASK_ENVELOPE_JSON → TaskEnvelope  [exit 2 on failure]
+    2. CredentialResolver.resolve(envelope)      [exit 2 on failure]
+    3. ContextBundleService.pull(s3_prefix)      [exit 2 on failure]
+    4. AgentRunner.chat(user_message, ...)       [exit 1 on failure]
+    5. S3MemoryWriteTool (agent-invoked during step 4) → daily memory file on S3
+    6. sys.exit(0)
+```
+
+Structured JSON logs are emitted to stdout for each step, keyed by `step` and `status` fields.
+
 ## Package Structure
 
 | File | Purpose |
 |------|---------|
 | `marvin/models.py` | `AgentConfig`, `TaskEnvelope`, `LLMProvider`, `ToolProfile` — Pydantic models |
 | `marvin/worker.py` | SQS consumer loop entry point (`python -m marvin`) |
+| `entrypoint.py` | One-shot Fargate/Batch entry point (one task, then exit) |
 | `marvin/runner.py` | `AgentRunner` — orchestrates tool-call loop with rate limiting |
 | `marvin/context.py` | `ContextBundleService` — reads customer context from S3 |
 | `marvin/llm/` | LLM clients (Anthropic, Gemini, OpenAI, Ollama) |
 | `marvin/tools/` | Tool base classes, registry, built-in tools, coding tools |
 | `marvin/rate_limiter.py` | Thread-safe sliding-window rate limiter (keyed by agent name) |
 
-## TaskEnvelope flow
+## SQS consumer flow
 
 ```
 SQS → poll_once() → TaskEnvelope.model_validate()
