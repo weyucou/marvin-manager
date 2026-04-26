@@ -77,22 +77,22 @@ class LLMMessage:
         return result
 
     @classmethod
-    def system(cls, content: str) -> "LLMMessage":
+    def system(cls, content: str) -> LLMMessage:
         """Create a system message."""
         return cls(role=MessageRole.SYSTEM, content=content)
 
     @classmethod
-    def user(cls, content: str) -> "LLMMessage":
+    def user(cls, content: str) -> LLMMessage:
         """Create a user message."""
         return cls(role=MessageRole.USER, content=content)
 
     @classmethod
-    def assistant(cls, content: str, tool_calls: list[ToolCall] | None = None) -> "LLMMessage":
+    def assistant(cls, content: str, tool_calls: list[ToolCall] | None = None) -> LLMMessage:
         """Create an assistant message."""
         return cls(role=MessageRole.ASSISTANT, content=content, tool_calls=tool_calls)
 
     @classmethod
-    def tool_result(cls, tool_call_id: str, content: str, name: str | None = None) -> "LLMMessage":
+    def tool_result(cls, tool_call_id: str, content: str, name: str | None = None) -> LLMMessage:
         """Create a tool result message."""
         return cls(
             role=MessageRole.TOOL,

@@ -8,6 +8,31 @@ For the full system architecture see [weyucou/wyc6k-spec](https://github.com/wey
 
 marvin is a stateless worker. It receives a hydrated context bundle (pulled from S3 by the worker entrypoint) and a task description, then runs an `AgentRunner` loop to completion. It does not own scheduling, dispatch, or customer identity — those belong to jones.
 
+## Worker Paths
+
+Two execution modes share the `marvin/` codebase. Choose based on deployment context:
+
+| Mode | Entry point | Invocation | When to use |
+|------|------------|------------|-------------|
+| **SQS consumer** | `marvin/worker.py` | `python -m marvin` | Long-lived container polling an SQS queue (e.g. ECS service) |
+| **One-shot Fargate** | `entrypoint.py` | container `ENTRYPOINT` | ECS Fargate RunTask per task — container starts, runs one `TaskEnvelope`, exits |
+
+### One-shot Fargate flow (`entrypoint.py`)
+
+```
+ECS RunTask (TASK_ENVELOPE_JSON env var)
+    ↓
+entrypoint.py
+    1. Parse   — TaskEnvelope.model_validate_json(TASK_ENVELOPE_JSON)
+    2. Resolve — CredentialResolver.resolve(envelope) → GITHUB_TOKEN / api_key
+    3. Pull    — ContextBundleService.pull(s3_context_prefix) → CustomerContextBundle
+    4. Run     — AgentRunner.chat(user_message, ...)
+    5. Memory  — ContextBundleService.push_memory(...) → daily memory file on S3
+    6. Exit    — 0 (success) | 1 (task failure) | 2 (setup/config failure)
+```
+
+The one-shot path never polls SQS. `TASK_ENVELOPE_JSON` is injected by the ECS task definition override at launch time (see `wyc6k-infra`).
+
 ## Package Structure
 
 | File | Purpose |
