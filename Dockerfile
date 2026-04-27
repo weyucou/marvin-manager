@@ -21,7 +21,7 @@ RUN uv sync --frozen --no-dev
 COPY marvin/ marvin/
 COPY entrypoint.py ./
 
-# askcc-cli — confirm package name before release (see issue #66 Q2)
-RUN uv pip install --system askcc-cli
+# askcc v0.2.8 pinned — not on PyPI, installed from GitHub archive
+RUN uv pip install --system https://github.com/monkut/askcc-cli/archive/refs/tags/v0.2.8.tar.gz
 
 ENTRYPOINT ["uv", "run", "python", "entrypoint.py"]
