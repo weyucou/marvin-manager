@@ -224,3 +224,5 @@ cache/
 output/
 notebooks/*.jpg
 CLAUDE.md
+.claude/settings.local.json
+.claude/worktrees/
