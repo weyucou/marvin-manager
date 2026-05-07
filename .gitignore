@@ -224,3 +224,7 @@ cache/
 output/
 notebooks/*.jpg
 CLAUDE.md
+
+# Claude Code
+.claude/worktrees/
+CHECKPOINT.md
