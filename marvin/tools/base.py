@@ -40,12 +40,12 @@ class ToolResult:
         return result
 
     @classmethod
-    def success(cls, output: str, data: dict[str, Any] | None = None) -> "ToolResult":
+    def success(cls, output: str, data: dict[str, Any] | None = None) -> ToolResult:
         """Create a successful result."""
         return cls(status=ToolStatus.SUCCESS, output=output, data=data or {})
 
     @classmethod
-    def from_error(cls, error_msg: str, output: str = "") -> "ToolResult":
+    def from_error(cls, error_msg: str, output: str = "") -> ToolResult:
         """Create an error result."""
         return cls(status=ToolStatus.ERROR, output=output, error=error_msg)
 

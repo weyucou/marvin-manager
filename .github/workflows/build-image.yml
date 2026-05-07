@@ -1,0 +1,40 @@
+name: Build and push agent-worker image
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write  # OIDC token for AWS role assumption
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # SHA pinned to v4.2.2 — update via: gh release view -R actions/checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure AWS credentials via OIDC
+        # SHA pinned to v4.0.2 — update via: gh release view -R aws-actions/configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ vars.ECR_PUSH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        # SHA pinned to v2.0.1 — update via: gh release view -R aws-actions/amazon-ecr-login
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+
+      - name: Build and push image
+        # SHA pinned to v6.14.0 — update via: gh release view -R docker/build-push-action
+        uses: docker/build-push-action@ca877d9245402d1537745e0e4b8aee4948b7a8bf # v6.14.0
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/agent-worker:latest
+            ${{ steps.ecr-login.outputs.registry }}/agent-worker:sha-${{ github.sha }}
