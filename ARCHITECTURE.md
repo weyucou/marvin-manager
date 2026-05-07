@@ -33,6 +33,53 @@ entrypoint.py
 
 The one-shot path never polls SQS. `TASK_ENVELOPE_JSON` is injected by the ECS task definition override at launch time (see `wyc6k-infra`).
 
+### Building & publishing the agent-worker image
+
+The image can be built and pushed to ECR either automatically (via `.github/workflows/build-image.yml` on push to `main`) or manually from a developer workstation. Both paths produce the same artifact tags: `latest` plus `sha-<short-sha>`.
+
+Prerequisites:
+
+- Docker with BuildKit + buildx (`docker buildx version` to confirm)
+- AWS credentials authenticated to the **dev** account with permission to push to the `weyucou/agent-worker` ECR repository (the active shell is the auth boundary — do **not** pass `--profile` flags or set `AWS_PROFILE` in these snippets unless your local setup requires it)
+- The ECR repository `weyucou/agent-worker` must exist in the target account/region (create it once via `aws ecr create-repository --repository-name weyucou/agent-worker`)
+
+Manual build + push:
+
+```bash
+# 0. Substitute these for your environment
+AWS_ACCOUNT_ID=610714125210               # weyucou dev account
+AWS_REGION=us-west-2                      # ECR repo region
+SHORT_SHA=$(git rev-parse --short HEAD)
+ECR_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/weyucou/agent-worker
+
+# 1. Build (multi-stage, fargate dep-group, ~349 MB)
+docker buildx build --platform linux/amd64 \
+  -t weyucou/agent-worker:local \
+  -t ${ECR_URI}:latest \
+  -t ${ECR_URI}:sha-${SHORT_SHA} \
+  --load .
+
+# 2. Verify size before pushing (AC #7: < 2 GB)
+docker image inspect weyucou/agent-worker:local --format '{{.Size}}'
+
+# 3. Authenticate Docker to ECR (12-hour token)
+aws ecr get-login-password --region ${AWS_REGION} \
+  | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+# 4. Push both tags
+docker push ${ECR_URI}:latest
+docker push ${ECR_URI}:sha-${SHORT_SHA}
+
+# 5. Verify
+aws ecr describe-images --repository-name weyucou/agent-worker --region ${AWS_REGION} \
+  --query 'imageDetails[?contains(imageTags, `latest`) || contains(imageTags, `sha-'${SHORT_SHA}'`)].[imageTags,imageSizeInBytes,imagePushedAt]' \
+  --output table
+```
+
+Automated build + push (GHA workflow):
+
+The workflow at `.github/workflows/build-image.yml` performs the same five steps on push to `main` using the OIDC IAM role configured via repository variables `AWS_REGION` and `ECR_PUSH_ROLE_ARN`. Until those repo variables are set the workflow will fail at step 3 (`configure-aws-credentials`) — until then, use the manual procedure above.
+
 ## Package Structure
 
 | File | Purpose |
