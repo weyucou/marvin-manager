@@ -103,5 +103,8 @@ class TaskEnvelope(BaseModel):
     conversation_history: list[dict[str, Any]] = Field(default_factory=list)
     enable_tools: bool = True
     max_tool_iterations: int = 10
+    # Estimated runtime, used by the control plane (wyc6k-task-manager) to pick a
+    # compute backend. The runtime itself ignores it.
+    duration_hint_seconds: int = 300
     github_token_secret_id: str | None = None
     anthropic_api_key_secret_id: str | None = None

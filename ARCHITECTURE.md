@@ -80,6 +80,31 @@ Automated build + push (GHA workflow):
 
 The workflow at `.github/workflows/build-image.yml` performs the same five steps on push to `main` using the OIDC IAM role configured via repository variables `AWS_REGION` and `ECR_PUSH_ROLE_ARN`. Until those repo variables are set the workflow will fail at step 3 (`configure-aws-credentials`) — until then, use the manual procedure above.
 
+## End-to-end pipeline tests
+
+`tests/integration/` walks a `TaskEnvelope` through the whole pipeline and
+asserts on real state at every hop. AWS is served in-process by moto
+(`@mock_aws()`) — no Docker daemon, no LocalStack, no network.
+
+| Scenario | Path exercised |
+|----------|----------------|
+| Short task (`duration_hint_seconds=300`) | SQS → inline execution → `github_issue` comment → S3 daily memory; asserts no ECS task was started |
+| Medium task (`duration_hint_seconds=3600`) | SQS → `ecs:RunTask` on the `agent-worker` task definition → the recorded `TASK_ENVELOPE_JSON` override drives `entrypoint.main()` → PR link on the issue → S3 memory |
+| Malformed envelope | `marvin.worker.poll_once` fails to parse and never deletes the message → SQS redrives it to the shared DLQ after `maxReceiveCount=3` |
+
+Only two boundaries are stubbed, both outside AWS:
+
+| Boundary | Stand-in |
+|----------|----------|
+| LLM | A scripted OpenAI-compatible endpoint on localhost. The agent reaches it through the real `OpenAIClient` (`LLMProvider.VLLM`), so tool serialisation, the tool-call loop and tool execution are production code. |
+| GitHub | A recording `gh` executable placed at the front of `PATH`, capturing each invocation's arguments and the token it ran with. |
+
+**Routing is not runtime code.** Choosing Lambda / Fargate / Batch belongs to
+`wyc6k-task-manager` (see the Repository Responsibility Boundary in
+`wyc6k-spec`). The tests drive that step through
+`tests/integration/control_plane.py`, a stand-in that mirrors the documented
+contract; it must never move into `marvin/`.
+
 ## Package Structure
 
 | File | Purpose |

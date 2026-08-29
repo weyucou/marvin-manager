@@ -74,6 +74,7 @@ All tools inherit from `BaseTool` (`marvin/tools/base.py`) and are registered vi
 | Variable | Required By | Description |
 |----------|-------------|-------------|
 | `SQS_QUEUE_URL` | worker | SQS queue URL to poll for tasks |
+| `SQS_WAIT_TIME_SECONDS` | worker | Long-poll wait per receive call (default `20`) |
 | `ZAATAR_SEARCH_API_URL` | `web_search` | Base URL of a deployed [zaatar-search-api](https://github.com/monkut/zaatar-search-api) instance (e.g. `http://localhost:5000`) |
 | `ANTHROPIC_API_KEY` | `image` | Anthropic API key for vision analysis |
 
@@ -89,8 +90,17 @@ All tools inherit from `BaseTool` (`marvin/tools/base.py`) and are registered vi
 ### Run Tests
 
 ```bash
-uv run poe test
+uv run poe test                  # everything
+uv run pytest tests/integration  # end-to-end pipeline only
 ```
+
+`tests/integration/` walks a `TaskEnvelope` through the whole pipeline — SQS
+delivery, compute routing, the agent's tool calls against a GitHub issue, and
+the daily memory file written back to S3. AWS is served in-process by
+[moto](https://docs.getmoto.org/) (`@mock_aws()`), so no Docker daemon,
+LocalStack container or network access is required. The two external
+boundaries are stubbed: the model behind an OpenAI-compatible endpoint the real
+client talks to, and the `gh` CLI behind a recording stand-in on `PATH`.
 
 ### Run Linter
 
@@ -117,6 +127,7 @@ wyc6k-task-runner/
 │   ├── context.py          # ContextBundleService — reads from S3
 │   └── rate_limiter.py     # Thread-safe sliding-window rate limiter
 ├── tests/                  # pytest tests
+│   └── integration/        # end-to-end pipeline tests (moto)
 ├── docker-compose.yaml     # LocalStack (SQS/S3) for development
 └── pyproject.toml          # Project dependencies
 ```
