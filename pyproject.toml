@@ -42,6 +42,7 @@ dev = [
     "poethepoet>=0.34.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=0.23.0",
+    "moto>=5.0.0",
 ]
 # Runtime deps for the Fargate one-shot worker (entrypoint.py).
 # Excludes sentence-transformers / numpy (and their transitive torch + triton)
@@ -76,6 +77,11 @@ typecheck = "uv run pyright"
 [tool.poe.tasks.test]
 # run the test command in a shell
 shell = "uv run pytest tests/ -v"
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: end-to-end pipeline tests (SQS → agent → GitHub → S3), backed by moto",
+]
 
 [tool.pyright]
 include = ["marvin"]

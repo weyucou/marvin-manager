@@ -26,6 +26,7 @@ SQS_ENDPOINT_URL = os.getenv("SQS_ENDPOINT_URL", "")
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "5"))
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "1"))
 VISIBILITY_TIMEOUT = int(os.getenv("VISIBILITY_TIMEOUT", "300"))
+WAIT_TIME_SECONDS = int(os.getenv("SQS_WAIT_TIME_SECONDS", "20"))
 
 _shutdown = False
 
@@ -92,7 +93,7 @@ def poll_once(sqs: Any) -> None:
     response = sqs.receive_message(
         QueueUrl=SQS_QUEUE_URL,
         MaxNumberOfMessages=MAX_MESSAGES,
-        WaitTimeSeconds=20,
+        WaitTimeSeconds=WAIT_TIME_SECONDS,
         VisibilityTimeout=VISIBILITY_TIMEOUT,
     )
 
