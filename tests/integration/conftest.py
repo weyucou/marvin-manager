@@ -9,6 +9,7 @@ network access is needed either.
 import json
 import os
 import sys
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 import boto3
@@ -253,8 +254,26 @@ def fargate(ecs_client) -> FargateEnvironment:
     )
 
 
+@contextmanager
+def github_token_isolation(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Hide any ambient GITHUB_TOKEN, and drop whatever is written in its place.
+
+    `CredentialResolver.resolve()` writes the token it resolved straight into
+    `os.environ`. `monkeypatch` recorded nothing to undo when the variable was
+    absent to begin with — the CI case — so that write would otherwise survive
+    teardown and every later test in the session would see the stub token.
+    Popping it here runs before monkeypatch's own undo, which then restores a
+    developer's ambient token if the environment had one.
+    """
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    try:
+        yield
+    finally:
+        os.environ.pop("GITHUB_TOKEN", None)
+
+
 @pytest.fixture
-def gh_cli(tmp_path, monkeypatch) -> GhRecorder:
+def gh_cli(tmp_path, monkeypatch) -> Iterator[GhRecorder]:
     """Put a recording `gh` stand-in at the front of PATH."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -270,11 +289,10 @@ def gh_cli(tmp_path, monkeypatch) -> GhRecorder:
     )
     stub.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    # Clear any ambient token so Secrets Manager is the only source the runtime
-    # can resolve one from; monkeypatch restores the original at teardown even
-    # though the credential resolver writes to os.environ itself.
-    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    return GhRecorder(record_path)
+    # Secrets Manager must be the only source the runtime can resolve a token
+    # from, and the resolved token must not outlive the test.
+    with github_token_isolation(monkeypatch):
+        yield GhRecorder(record_path)
 
 
 @pytest.fixture
