@@ -7,3 +7,8 @@ repos:
     - id: ruff
     # Run the formatter.
     - id: ruff-format
+- repo: https://github.com/gitleaks/gitleaks
+  # Matches the pinned CLI version the CI secret-scan job installs.
+  rev: v8.30.1
+  hooks:
+    - id: gitleaks
